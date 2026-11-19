@@ -241,3 +241,17 @@ If that alone hangs, restart the Windows Management Instrumentation service (`Ge
 
 ### "Address already in use" on port 5000
 Another program uses port 5000 (on macOS, AirPlay Receiver often does). Stop it, or change the last line of `app.py` to `app.run(debug=True, port=5001)`.
+
+## Deploy on Render
+
+This repository has a [Render Blueprint](render.yaml) for a free web service that runs the Flask app with `gunicorn app:app`, pins Python to 3.13 (`.python-version`) and takes the two secrets as environment variables.
+
+1. **Let Render reach MongoDB Atlas.** In Atlas open **Network Access**. Render says its services use "specific sets of IP ranges depending on their region", shared by all services in that region, and that a service "might use any IP address within its associated ranges". The ranges are in the Render dashboard (service page, **Connect**, **Outbound** tab). Add them to the Atlas allowlist. Allowing `0.0.0.0/0` also works but lets any address attempt a connection, so use a strong database password. Without an allowlist entry the app fails with the same SSL handshake error described under Troubleshooting.
+2. **Create the service.** In the Render dashboard choose **New > Blueprint**, pick this repository, and enter `ANTHROPIC_API_KEY` and `MONGO_URI` when asked. Render only asks for these once, when the Blueprint is created, and they are never stored in the repository. Optionally add `ANTHROPIC_MODEL`.
+3. **Open the service URL** and paste a job description into the chat.
+
+Limits of the free plan that matter here:
+
+- A free web service spins down after 15 minutes without traffic, and waking takes about a minute.
+- Local files are lost when the service redeploys, restarts or spins down, and free services cannot attach a persistent disk. The LangGraph checkpoints live in `checkpoints.sqlite`, so a run that is paused on a question is lost when that happens. For pauses that must survive, use a different checkpointer such as Postgres or a paid plan with a disk.
+- The app stores published jobs in the `jobs` collection of the `jd_intake_db` database of whatever `MONGO_URI` points to, so a deployment and a local run that share a URI share their jobs and their duplicate check.

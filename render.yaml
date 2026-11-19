@@ -1,0 +1,21 @@
+# Render Blueprint for the JD intake chat app (Flask + LangGraph + Claude + MongoDB Atlas).
+# Create it from the dashboard: New > Blueprint > pick this repo. Render asks for the two secrets below.
+services:
+  - type: web
+    name: jd-intake-agent
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    # One worker with threads: the LangGraph checkpointer shares a single SQLite connection.
+    # The timeout is long because one run makes several LLM calls (extract, score, rewrite).
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 300
+    healthCheckPath: /
+    envVars:
+      # Secrets: entered once in the Render dashboard, never stored in this repository.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MONGO_URI
+        sync: false
